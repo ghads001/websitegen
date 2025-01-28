@@ -1,0 +1,537 @@
+<title>Claude Sonnet 3.5 AI Composer & Website Generator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<style>
+  :root {
+    --primary-color: #00bcd4;
+    --secondary-color: #ff4081;
+    --tertiary-color: #ffc107;
+    --background-color: #f5f5f7;
+    --text-color: #333333;
+    --container-color: #ffffff;
+    --input-background: #f0f0f0;
+  }
+
+  @font-face {
+    font-family: 'Poppins';
+    src: url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+  }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: var(--background-color);
+    color: var(--text-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .container {
+    background: var(--container-color);
+    border-radius: 30px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    width: 95%;
+    max-width: 1080px;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .avatar-container {
+    width: 80px;
+    height: 80px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 50%;
+    box-shadow: 0 4px 20px rgba(0, 188, 212, 0.3);
+  }
+
+  .title {
+    font-size: 2.2rem;
+    font-weight: 600;
+    margin: 0;
+    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .input-container, .prompt-input-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  input[type="text"], textarea {
+    padding: 0.8rem 1.2rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 10px;
+    background: var(--input-background);
+    color: var(--text-color);
+    transition: all 0.3s ease;
+  }
+
+  input[type="text"]:focus, textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.3);
+  }
+
+  button {
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
+  }
+
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
+  }
+
+  .output-container {
+    background: var(--input-background);
+    border-radius: 15px;
+    padding: 1.5rem;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .preloader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 10;
+  }
+
+  .action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .action-button {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--tertiary-color);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .action-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(255, 193, 7, 0.3);
+  }
+
+  #preview-container {
+    width: 100%;
+    height: 500px;
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  @media (max-width: 768px) {
+    .container {
+      padding: 1.5rem;
+    }
+
+    .header {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .title {
+      font-size: 1.8rem;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const Avatar = () => {
+  React.useEffect(() => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(80, 80);
+    document.querySelector('.avatar-container').appendChild(renderer.domElement);
+
+    const geometry = new THREE.TorusKnotGeometry(0.8, 0.3, 100, 16);
+    const material = new THREE.MeshPhysicalMaterial({
+      color: 0x00bcd4,
+      metalness: 0.7,
+      roughness: 0.2,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1
+    });
+    const torusKnot = new THREE.Mesh(geometry, material);
+    scene.add(torusKnot);
+
+    const light1 = new THREE.PointLight(0xffffff, 1, 100);
+    light1.position.set(10, 10, 10);
+    scene.add(light1);
+
+    const light2 = new THREE.PointLight(0xff4081, 1, 100);
+    light2.position.set(-10, -10, -10);
+    scene.add(light2);
+
+    camera.position.z = 2.5;
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+      torusKnot.rotation.x += 0.01;
+      torusKnot.rotation.y += 0.01;
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    return () => {
+      renderer.dispose();
+    };
+  }, []);
+
+  return <div className="avatar-container"></div>;
+};
+
+const WebsiteGenerator = () => {
+  const [loading, setLoading] = React.useState(false);
+  const [output, setOutput] = React.useState('');
+  const [previewHtml, setPreviewHtml] = React.useState('');
+
+  const handleSubmit = async () => {
+    const prompt = document.getElementById('website-prompt').value;
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/generate-website', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await response.json();
+      setOutput(data.generatedContent);
+      setPreviewHtml(data.generatedContent);
+    } catch (error) {
+      console.error('Error:', error);
+      setOutput('An error occurred while generating the website.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(output).then(() => {
+      alert('Code copied to clipboard!');
+    });
+  };
+
+  const downloadWebsite = () => {
+    const blob = new Blob([output], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'generated_website.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="container">
+      <div className="header">
+        <Avatar />
+        <h1 className="title">Website Generator</h1>
+      </div>
+      <div className="input-container">
+        <input id="website-prompt" type="text" placeholder="Describe your dream website..." />
+        <button onClick={handleSubmit}>Generate Website</button>
+      </div>
+      <div className="output-container">
+        {loading ? (
+          <div className="preloader">
+            <svg width="50" height="50" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#00bcd4" strokeWidth="8" strokeDasharray="62.83185307179586 62.83185307179586">
+                <animateTransform
+                  attributeName="transform"
+                  type="rotate"
+                  repeatCount="indefinite"
+                  dur="1s"
+                  keyTimes="0;1"
+                  values="0 50 50;360 50 50"
+                ></animateTransform>
+              </circle>
+            </svg>
+          </div>
+        ) : (
+          <div>
+            <h3>Generated Code:</h3>
+            <pre style={{whiteSpace: 'pre-wrap', wordWrap: 'break-word'}}>{output}</pre>
+            {previewHtml && (
+              <div>
+                <h3>Preview:</h3>
+                <iframe
+                  id="preview-container"
+                  srcDoc={previewHtml}
+                  title="Website Preview"
+                  sandbox="allow-scripts"
+                ></iframe>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="action-buttons">
+        <button className="action-button" onClick={copyCode}>Copy Code</button>
+        <button className="action-button" onClick={downloadWebsite}>Download Website</button>
+      </div>
+    </div>
+  );
+};
+
+const PromptGenerator = () => {
+  const [masterPrompt, setMasterPrompt] = React.useState('');
+
+  const generateMasterPrompt = () => {
+    const concept = document.getElementById('concept').value;
+    const goal = document.getElementById('goal').value;
+    const style = document.getElementById('style').value;
+    const audience = document.getElementById('audience').value;
+    const features = document.getElementById('features').value;
+
+    const enhancedPrompt = `Create an innovative and captivating ${concept} that achieves the goal of ${goal}. The design should embody a ${style} aesthetic, tailored specifically for ${audience}. Incorporate cutting-edge features such as ${features}, ensuring a seamless and intuitive user experience. 
+
+Consider implementing:
+1. Responsive design principles for optimal viewing across all devices
+2. Accessibility standards (WCAG 2.1 AA compliance) to ensure inclusivity
+3. Performance optimization techniques for fast loading times
+4. Interactive elements that engage users and encourage exploration
+5. A harmonious color palette reflecting brand identity and evoking desired emotional responses
+6. Subtle animations and micro-interactions to enhance usability and provide visual feedback
+7. A visually balanced layout with a clear information hierarchy
+8. High-quality, relevant imagery or illustrations complementing the overall design
+9. SEO optimization, including meta tags, semantic HTML structure, and relevant keywords
+10. A content management system for easy updates and maintenance
+11. Cross-browser compatibility and mobile responsiveness
+12. Analytics tools integration for tracking user behavior and gathering insights
+13. Security measures to protect user data and ensure regulatory compliance
+14. Scalability considerations for future feature expansion
+15. A timeless design quality that remains relevant beyond current trends
+
+Additionally, consider:
+- Implementing a chatbot or AI assistant for enhanced user support
+- Integrating social media feeds or sharing capabilities
+- Adding a blog or news section for regular content updates
+- Incorporating user-generated content features
+- Implementing a robust search functionality
+- Adding multilingual support for global reach
+- Integrating e-commerce capabilities if relevant
+- Implementing a user account system with personalized experiences
+- Adding gamification elements to increase user engagement
+- Incorporating data visualization tools for complex information presentation
+
+Ensure the final product not only meets but exceeds current industry standards, positioning the ${concept} as a leader in its field and providing unparalleled value to ${audience}.`;
+
+    setMasterPrompt(enhancedPrompt);
+  };
+
+  const copyPrompt = () => {
+    navigator.clipboard.writeText(masterPrompt).then(() => {
+      alert('Master prompt copied to clipboard!');
+    });
+  };
+
+  return (
+    <div className="container">
+      <div className="header">
+        <Avatar />
+        <h1 className="title">Prompt Generator</h1>
+      </div>
+      <div className="prompt-input-container">
+        <input id="concept" type="text" placeholder="What's the main concept? (e.g., e-commerce platform, portfolio website)" />
+        <input id="goal" type="text" placeholder="What's the primary goal? (e.g., increase sales, showcase work)" />
+        <input id="style" type="text" placeholder="Describe the desired style or aesthetic" />
+        <input id="audience" type="text" placeholder="Who is the target audience?" />
+        <input id="features" type="text" placeholder="List key features or functionalities" />
+        <button onClick={generateMasterPrompt}>Generate Master Prompt</button>
+      </div>
+      <div className="output-container">
+        <h3>Master Prompt:</h3>
+        <textarea rows="15" value={masterPrompt} readOnly style={{width: '100%', marginTop: '10px'}}></textarea>
+      </div>
+      <div className="action-buttons">
+        <button className="action-button" onClick={copyPrompt}>Copy Master Prompt</button>
+      </div>
+    </div>
+  );
+};
+
+const App = () => {
+  React.useEffect(() => {
+    gsap.from(".container", {duration: 1, opacity: 0, y: 50, stagger: 0.2, ease: "power3.out"});
+  }, []);
+
+  return (
+    <React.Fragment>
+      <WebsiteGenerator />
+      <PromptGenerator />
+    </React.Fragment>
+  );
+};
+
+ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+
+<!-- Simulated Backend Endpoint -->
+<script>
+  htmx.onLoad(function() {
+    htmx.defineEndpoint("/api/generate-website", {
+      method: "POST",
+      handler: function(request) {
+        const prompt = JSON.parse(request.body).prompt;
+        // Simulate API call to Claude
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            // This is where we would normally call the AI to generate the website
+            // For now, we'll return a sample HTML structure
+            const generatedContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Generated Website</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background: linear-gradient(45deg, #00bcd4, #ff4081);
+            color: white;
+            text-align: center;
+            padding: 1rem;
+            border-radius: 10px;
+        }
+        nav {
+            display: flex;
+            justify-content: space-around;
+            margin: 1rem 0;
+        }
+        nav a {
+            color: #00bcd4;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        nav a:hover {
+            background-color: #f0f0f0;
+        }
+        main {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f0f0f0;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Welcome to Your AI-Generated Website</h1>
+    </header>
+    <nav>
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#services">Services</a>
+        <a href="#contact">Contact</a>
+    </nav>
+    <main>
+        <div class="card">
+            <h2>Feature 1</h2>
+            <p>Description of feature 1 goes here.</p>
+        </div>
+        <div class="card">
+            <h2>Feature 2</h2>
+            <p>Description of feature 2 goes here.</p>
+        </div>
+        <div class="card">
+            <h2>Feature 3</h2>
+            <p>Description of feature 3 goes here.</p>
+        </div>
+    </main>
+    <footer>
+        <p>&copy; 2024 AI-Generated Website. All rights reserved.</p>
+    </footer>
+</body>
+</html>
+            `;
+            
+            resolve({
+              generatedContent: generatedContent
+            });
+          }, 2000); // Simulating a 2-second delay
+        });
+      }
+    });
+  });
+</script>
+</body></html>
